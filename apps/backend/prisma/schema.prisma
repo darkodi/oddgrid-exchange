@@ -1,0 +1,114 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  username  String?
+  createdAt DateTime @default(now())
+
+  balances  Balance[]
+  orders    Order[]
+  positions Position[]
+}
+
+model Venue {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique // "polymarket", "kalshi", "manifold", "oddgrid"
+  createdAt DateTime @default(now())
+
+  markets   Market[]
+}
+
+model Market {
+  id             String    @id @default(cuid())
+  venue          Venue     @relation(fields: [venueId], references: [id])
+  venueId        String
+  externalId     String    // id from Polymarket/Kalshi/Manifold if external
+  title          String
+  description    String?
+  resolutionRule String?
+  status         MarketStatus @default(OPEN) // OPEN, RESOLVED, SUSPENDED
+  type           MarketType   @default(YES_NO)
+  createdAt      DateTime  @default(now())
+
+  orders         Order[]
+  positions      Position[]
+}
+
+enum MarketStatus {
+  OPEN
+  RESOLVED
+  SUSPENDED
+}
+
+enum MarketType {
+  YES_NO
+  MULTI_OUTCOME // later
+}
+
+model Balance {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  currency  String   // "USDV" (virtual USD)
+  amount    Decimal  @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, currency])
+}
+
+model Order {
+  id          String      @id @default(cuid())
+  user        User        @relation(fields: [userId], references: [id])
+  userId      String
+  market      Market      @relation(fields: [marketId], references: [id])
+  marketId    String
+  side        OrderSide   // BUY/SELL
+  outcome     String      // "YES"/"NO" for YES/NO markets
+  orderType   OrderType   // LIMIT/MARKET
+  price       Decimal     // probability or price [0,1]
+  size        Decimal     // number of shares
+  status      OrderStatus @default(OPEN)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+enum OrderSide {
+  BUY
+  SELL
+}
+
+enum OrderType {
+  LIMIT
+  MARKET
+}
+
+enum OrderStatus {
+  OPEN
+  PARTIALLY_FILLED
+  FILLED
+  CANCELED
+}
+
+model Position {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  market    Market   @relation(fields: [marketId], references: [id])
+  marketId  String
+  outcome   String
+  size      Decimal  // net YES/NO shares
+  avgPrice  Decimal  // VWAP for simulation
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, marketId, outcome])
+}
