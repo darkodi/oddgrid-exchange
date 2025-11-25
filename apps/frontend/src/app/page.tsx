@@ -19,7 +19,18 @@ type Market = {
 type Balance = {
   id: string;
   currency: string;
-  amount: string; // Prisma Decimal serialized as string
+  amount: string;
+};
+
+type Position = {
+  id: string;
+  outcome: string;
+  size: string;
+  avgPrice: string;
+  market: {
+    id: string;
+    title: string;
+  };
 };
 
 type MeResponse = {
@@ -27,6 +38,7 @@ type MeResponse = {
   email: string;
   username: string | null;
   balances: Balance[];
+  positions: Position[];
 };
 
 const BACKEND_URL = "http://localhost:4000";
@@ -39,6 +51,11 @@ export default function HomePage() {
   const [user, setUser] = useState<MeResponse | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // local trade state per market
+  const [probByMarket, setProbByMarket] = useState<Record<string, number>>({});
+  const [stakeByMarket, setStakeByMarket] = useState<Record<string, number>>({});
+  const [tradeMessage, setTradeMessage] = useState<string | null>(null);
 
   // Load markets once
   useEffect(() => {
@@ -119,12 +136,10 @@ export default function HomePage() {
 
       const data: { userId: string; email: string } = await res.json();
 
-      // Store userId locally for future sessions
       if (typeof window !== "undefined") {
         window.localStorage.setItem("oddgrid:userId", data.userId);
       }
 
-      // Fetch full profile + balances
       await fetchMe(data.userId);
     } catch (e: any) {
       console.error(e);
@@ -144,6 +159,63 @@ export default function HomePage() {
 
   const usdBalance = user?.balances.find((b) => b.currency === "USDV");
 
+  const getUserId = () => {
+    if (typeof window === "undefined") return null;
+    return window.localStorage.getItem("oddgrid:userId");
+  };
+
+  const handleTrade = async (marketId: string) => {
+    const userId = getUserId();
+    if (!userId) {
+      setError("You must be logged in to trade");
+      return;
+    }
+
+    const currentProb = probByMarket[marketId] ?? 60;
+    const currentStake = stakeByMarket[marketId] ?? 100;
+
+    const probability = currentProb / 100; // convert % to 0–1
+    const stakeUsd = currentStake;
+
+    try {
+      setError(null);
+      setTradeMessage(null);
+
+      const res = await fetch(`${BACKEND_URL}/orders`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-id": userId,
+        },
+        body: JSON.stringify({
+          marketId,
+          probability,
+          stakeUsd,
+        }),
+      });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || "Order failed");
+      }
+
+      const data = await res.json();
+      console.log("Order result", data);
+
+      setTradeMessage(
+        `Trade filled: bought YES at ${(probability * 100).toFixed(
+          1
+        )}% for ${stakeUsd.toFixed(2)} USDV`
+      );
+
+      // refresh user balances + positions
+      await fetchMe(userId);
+    } catch (e: any) {
+      console.error(e);
+      setError(e.message || "Order error");
+    }
+  };
+
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100">
       <div className="max-w-6xl mx-auto px-4 py-8 space-y-8">
@@ -152,7 +224,8 @@ export default function HomePage() {
           <div>
             <h1 className="text-3xl font-bold">OddGrid (Phase 1)</h1>
             <p className="text-xs text-slate-400 mt-1">
-              Simulation-only · multi-venue markets · dev login
+              Simulation-only · multi-venue markets · dev login · simple YES
+              buys
             </p>
           </div>
 
@@ -213,42 +286,100 @@ export default function HomePage() {
               </div>
             )}
             {error && (
-              <p className="mt-2 text-xs text-red-400">
-                {error}
-              </p>
+              <p className="mt-2 text-xs text-red-400">{error}</p>
+            )}
+            {tradeMessage && (
+              <p className="mt-2 text-xs text-emerald-400">{tradeMessage}</p>
             )}
           </div>
         </header>
 
-        {/* Markets list */}
-        <section>
-          <h2 className="text-lg font-semibold mb-3">Markets</h2>
+        {/* Markets + trade ticket */}
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold">Markets</h2>
           {loadingMarkets ? (
             <p className="text-sm text-slate-300">Loading markets…</p>
           ) : (
             <div className="grid md:grid-cols-2 gap-4">
-              {markets.map((m) => (
-                <div
-                  key={m.id}
-                  className="rounded-xl border border-slate-800 p-4 bg-slate-900"
-                >
-                  <div className="flex justify-between items-center mb-2">
-                    <h3 className="text-base font-semibold">{m.title}</h3>
-                    <span className="text-[10px] uppercase tracking-wide text-slate-400">
-                      {m.venue?.slug}
-                    </span>
+              {markets.map((m) => {
+                const prob = probByMarket[m.id] ?? 60;
+                const stake = stakeByMarket[m.id] ?? 100;
+                return (
+                  <div
+                    key={m.id}
+                    className="rounded-xl border border-slate-800 p-4 bg-slate-900 flex flex-col gap-3"
+                  >
+                    <div className="flex justify-between items-center">
+                      <h3 className="text-base font-semibold">{m.title}</h3>
+                      <span className="text-[10px] uppercase tracking-wide text-slate-400">
+                        {m.venue?.slug}
+                      </span>
+                    </div>
+                    {m.description && (
+                      <p className="text-sm text-slate-300 line-clamp-3">
+                        {m.description}
+                      </p>
+                    )}
+                    <div className="flex items-center justify-between text-xs text-slate-400">
+                      <span>Status: {m.status}</span>
+                      <span>Phase 1 · virtual only</span>
+                    </div>
+
+                    {/* Trade ticket */}
+                    {user ? (
+                      <div className="mt-2 space-y-2 border-t border-slate-800 pt-2">
+                        <div className="flex gap-2 items-center">
+                          <label className="text-xs text-slate-300 w-24">
+                            Probability
+                          </label>
+                          <input
+                            type="number"
+                            min={1}
+                            max={99}
+                            value={prob}
+                            onChange={(e) =>
+                              setProbByMarket((prev) => ({
+                                ...prev,
+                                [m.id]: Number(e.target.value),
+                              }))
+                            }
+                            className="w-20 rounded-md bg-slate-950 border border-slate-800 px-2 py-1 text-xs"
+                          />
+                          <span className="text-xs text-slate-400">%</span>
+                        </div>
+                        <div className="flex gap-2 items-center">
+                          <label className="text-xs text-slate-300 w-24">
+                            Stake
+                          </label>
+                          <input
+                            type="number"
+                            min={1}
+                            value={stake}
+                            onChange={(e) =>
+                              setStakeByMarket((prev) => ({
+                                ...prev,
+                                [m.id]: Number(e.target.value),
+                              }))
+                            }
+                            className="w-28 rounded-md bg-slate-950 border border-slate-800 px-2 py-1 text-xs"
+                          />
+                          <span className="text-xs text-slate-400">USDV</span>
+                        </div>
+                        <button
+                          onClick={() => handleTrade(m.id)}
+                          className="mt-1 w-full rounded-md bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold py-1.5"
+                        >
+                          Buy YES
+                        </button>
+                      </div>
+                    ) : (
+                      <p className="mt-2 text-[11px] text-slate-500 border-t border-slate-800 pt-2">
+                        Login (dev) to simulate trades.
+                      </p>
+                    )}
                   </div>
-                  {m.description && (
-                    <p className="text-sm text-slate-300 line-clamp-3">
-                      {m.description}
-                    </p>
-                  )}
-                  <div className="mt-3 flex items-center justify-between text-xs text-slate-400">
-                    <span>Status: {m.status}</span>
-                    <span>Phase 1 · virtual only</span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
               {markets.length === 0 && (
                 <p className="text-sm text-slate-400">
                   No markets yet. Seed via backend.
@@ -257,6 +388,35 @@ export default function HomePage() {
             </div>
           )}
         </section>
+
+        {/* Simple positions view (debuggy) */}
+        {user && user.positions.length > 0 && (
+          <section className="space-y-2">
+            <h2 className="text-sm font-semibold text-slate-200">
+              Open Positions (debug view)
+            </h2>
+            <div className="space-y-1 text-xs text-slate-300">
+              {user.positions.map((p) => (
+                <div
+                  key={p.id}
+                  className="flex justify-between border border-slate-800 rounded-md px-3 py-1.5 bg-slate-900"
+                >
+                  <div className="flex-1 mr-2">
+                    <div className="font-semibold text-[11px]">
+                      {p.market.title} — {p.outcome}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div>Size: {Number(p.size).toFixed(2)} shares</div>
+                    <div>
+                      Avg price: {(Number(p.avgPrice) * 100).toFixed(1)}%
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
       </div>
     </main>
   );
