@@ -38,7 +38,7 @@ type MeResponse = {
   email: string;
   username: string | null;
   balances: Balance[];
-  positions: Position[];
+  positions?: Position[];
 };
 
 const BACKEND_URL = "http://localhost:4000";
@@ -54,7 +54,9 @@ export default function HomePage() {
 
   // local trade state per market
   const [probByMarket, setProbByMarket] = useState<Record<string, number>>({});
-  const [stakeByMarket, setStakeByMarket] = useState<Record<string, number>>({});
+  const [stakeByMarket, setStakeByMarket] = useState<Record<string, number>>(
+    {}
+  );
   const [tradeMessage, setTradeMessage] = useState<string | null>(null);
 
   // Load markets once
@@ -100,8 +102,11 @@ export default function HomePage() {
         throw new Error(body.error || "Failed to fetch user");
       }
 
-      const data: MeResponse = await res.json();
-      setUser(data);
+      const raw = (await res.json()) as MeResponse;
+      setUser({
+        ...raw,
+        positions: raw.positions ?? [],
+      });
     } catch (e: any) {
       console.error(e);
       setError(e.message || "Failed to load user");
@@ -249,7 +254,9 @@ export default function HomePage() {
                     Virtual balance
                   </div>
                   <div className="font-semibold">
-                    {usdBalance ? Number(usdBalance.amount).toLocaleString() : "0"}{" "}
+                    {usdBalance
+                      ? Number(usdBalance.amount).toLocaleString()
+                      : "0"}{" "}
                     USDV
                   </div>
                 </div>
@@ -285,9 +292,7 @@ export default function HomePage() {
                 </p>
               </div>
             )}
-            {error && (
-              <p className="mt-2 text-xs text-red-400">{error}</p>
-            )}
+            {error && <p className="mt-2 text-xs text-red-400">{error}</p>}
             {tradeMessage && (
               <p className="mt-2 text-xs text-emerald-400">{tradeMessage}</p>
             )}
@@ -390,7 +395,7 @@ export default function HomePage() {
         </section>
 
         {/* Simple positions view (debuggy) */}
-        {user && user.positions.length > 0 && (
+        {user && user.positions && user.positions.length > 0 && (
           <section className="space-y-2">
             <h2 className="text-sm font-semibold text-slate-200">
               Open Positions (debug view)
