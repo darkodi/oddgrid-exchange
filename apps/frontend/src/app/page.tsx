@@ -395,7 +395,7 @@ export default function HomePage() {
         </section>
 
         {/* Simple positions view (debuggy) */}
-        {user && user.positions && user.positions.length > 0 && (
+        {user?.positions && user.positions.length > 0 && (
           <section className="space-y-2">
             <h2 className="text-sm font-semibold text-slate-200">
               Open Positions (debug view)

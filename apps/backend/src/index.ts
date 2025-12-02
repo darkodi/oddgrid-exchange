@@ -101,7 +101,14 @@ app.get("/me", async (req, res) => {
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    include: { balances: true },
+    include: {
+      balances: true,
+      positions: {
+        include: {
+          market: true,
+        },
+      },
+    },
   });
 
   if (!user) {
@@ -113,8 +120,10 @@ app.get("/me", async (req, res) => {
     email: user.email,
     username: user.username,
     balances: user.balances,
+    positions: user.positions,
   });
 });
+
 
 /**
  * Markets list
