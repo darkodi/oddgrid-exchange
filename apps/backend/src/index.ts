@@ -3,7 +3,14 @@ import express from "express";
 import cors from "cors";
 import { PrismaClient } from "@prisma/client";
 
+import { OddgridAdapter } from "./aggregation/oddgridAdapter";
+import { MarketAggregationService } from "./aggregation/marketAggregationService";
+
+
 const prisma = new PrismaClient();
+const aggregationService = new MarketAggregationService([
+  new OddgridAdapter(prisma),
+]);
 const app = express();
 
 app.use(
@@ -137,6 +144,18 @@ app.get("/markets", async (_req, res) => {
 
   res.json(markets);
 });
+
+// Aggregated markets (currently only OddGrid; external venues later)
+app.get("/aggregated-markets", async (_req, res) => {
+  try {
+    const markets = await aggregationService.listAllMarkets();
+    res.json(markets);
+  } catch (e) {
+    console.error("aggregated-markets error", e);
+    res.status(500).json({ error: "Failed to load aggregated markets" });
+  }
+});
+
 
 /**
  * POST /orders
