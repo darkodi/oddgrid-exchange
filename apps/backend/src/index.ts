@@ -5,11 +5,14 @@ import { PrismaClient } from "@prisma/client";
 
 import { OddgridAdapter } from "./aggregation/oddgridAdapter";
 import { MarketAggregationService } from "./aggregation/marketAggregationService";
+import { PolymarketAdapter } from "./aggregation/polymarketAdapter";
+
 
 
 const prisma = new PrismaClient();
 const aggregationService = new MarketAggregationService([
   new OddgridAdapter(prisma),
+  new PolymarketAdapter(),
 ]);
 const app = express();
 
