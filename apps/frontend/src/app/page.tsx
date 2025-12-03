@@ -2,18 +2,29 @@
 
 import { useEffect, useState } from "react";
 
-type Venue = {
+type VenueSlug = "oddgrid" | "polymarket" | "kalshi" | "manifold";
+
+type NormalizedOutcome = {
   id: string;
   name: string;
-  slug: string;
+  probability: number | null;
+  bestBid?: number | null;
+  bestAsk?: number | null;
 };
 
 type Market = {
   id: string;
+  venue: VenueSlug;
+  externalId: string;
   title: string;
   description?: string | null;
-  status: string;
-  venue: Venue;
+  type: "YES_NO" | "MULTI_OUTCOME";
+  status: "OPEN" | "RESOLVED" | "SUSPENDED";
+  outcomes: NormalizedOutcome[];
+  resolutionRule?: string | null;
+  volume24h?: number | null;
+  openInterest?: number | null;
+  lastUpdated: string;
 };
 
 type Balance = {
@@ -63,7 +74,7 @@ export default function HomePage() {
   useEffect(() => {
     const fetchMarkets = async () => {
       try {
-        const res = await fetch(`${BACKEND_URL}/markets`);
+        const res = await fetch(`${BACKEND_URL}/aggregated-markets`);
         const data = await res.json();
         setMarkets(data);
       } catch (e) {
@@ -317,7 +328,7 @@ export default function HomePage() {
                     <div className="flex justify-between items-center">
                       <h3 className="text-base font-semibold">{m.title}</h3>
                       <span className="text-[10px] uppercase tracking-wide text-slate-400">
-                        {m.venue?.slug}
+                        {m.venue}
                       </span>
                     </div>
                     {m.description && (
