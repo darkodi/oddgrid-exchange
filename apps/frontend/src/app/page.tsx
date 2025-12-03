@@ -56,6 +56,7 @@ const BACKEND_URL = "http://localhost:4000";
 
 export default function HomePage() {
   const [markets, setMarkets] = useState<Market[]>([]);
+  const [venueFilter, setVenueFilter] = useState<VenueSlug | "all">("all");
   const [loadingMarkets, setLoadingMarkets] = useState(true);
 
   const [email, setEmail] = useState("");
@@ -313,95 +314,158 @@ export default function HomePage() {
         {/* Markets + trade ticket */}
         <section className="space-y-3">
           <h2 className="text-lg font-semibold">Markets</h2>
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-xs text-slate-400">Filter venue:</span>
+            {(
+              ["all", "oddgrid", "polymarket", "kalshi", "manifold"] as const
+            ).map((v) => (
+              <button
+                key={v}
+                onClick={() => setVenueFilter(v)}
+                className={`px-2 py-1 text-[11px] rounded-md border ${
+                  venueFilter === v
+                    ? "border-sky-500 bg-sky-900/40 text-sky-100"
+                    : "border-slate-700 bg-slate-900 text-slate-300"
+                }`}
+              >
+                {v.toUpperCase()}
+              </button>
+            ))}
+          </div>
+
           {loadingMarkets ? (
             <p className="text-sm text-slate-300">Loading markets…</p>
           ) : (
-            <div className="grid md:grid-cols-2 gap-4">
-              {markets.map((m) => {
-                const prob = probByMarket[m.id] ?? 60;
-                const stake = stakeByMarket[m.id] ?? 100;
-                return (
-                  <div
-                    key={m.id}
-                    className="rounded-xl border border-slate-800 p-4 bg-slate-900 flex flex-col gap-3"
+            <>
+              {/* Venue filter bar */}
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xs text-slate-400">Filter venue:</span>
+                {(
+                  [
+                    "all",
+                    "oddgrid",
+                    "polymarket",
+                    "kalshi",
+                    "manifold",
+                  ] as const
+                ).map((v) => (
+                  <button
+                    key={v}
+                    onClick={() => setVenueFilter(v)}
+                    className={`px-2 py-1 text-[11px] rounded-md border ${
+                      venueFilter === v
+                        ? "border-sky-500 bg-sky-900/40 text-sky-100"
+                        : "border-slate-700 bg-slate-900 text-slate-300"
+                    }`}
                   >
-                    <div className="flex justify-between items-center">
-                      <h3 className="text-base font-semibold">{m.title}</h3>
-                      <span className="text-[10px] uppercase tracking-wide text-slate-400">
-                        {m.venue}
-                      </span>
-                    </div>
-                    {m.description && (
-                      <p className="text-sm text-slate-300 line-clamp-3">
-                        {m.description}
-                      </p>
-                    )}
-                    <div className="flex items-center justify-between text-xs text-slate-400">
-                      <span>Status: {m.status}</span>
-                      <span>Phase 1 · virtual only</span>
-                    </div>
+                    {v.toUpperCase()}
+                  </button>
+                ))}
+              </div>
 
-                    {/* Trade ticket */}
-                    {user ? (
-                      <div className="mt-2 space-y-2 border-t border-slate-800 pt-2">
-                        <div className="flex gap-2 items-center">
-                          <label className="text-xs text-slate-300 w-24">
-                            Probability
-                          </label>
-                          <input
-                            type="number"
-                            min={1}
-                            max={99}
-                            value={prob}
-                            onChange={(e) =>
-                              setProbByMarket((prev) => ({
-                                ...prev,
-                                [m.id]: Number(e.target.value),
-                              }))
-                            }
-                            className="w-20 rounded-md bg-slate-950 border border-slate-800 px-2 py-1 text-xs"
-                          />
-                          <span className="text-xs text-slate-400">%</span>
+              {/* Visible markets based on filter */}
+              <div className="grid md:grid-cols-2 gap-4">
+                {(venueFilter === "all"
+                  ? markets
+                  : markets.filter((m) => m.venue === venueFilter)
+                ).map((m) => {
+                  const prob = probByMarket[m.id] ?? 60;
+                  const stake = stakeByMarket[m.id] ?? 100;
+
+                  return (
+                    <div
+                      key={m.id}
+                      className="rounded-xl border border-slate-800 p-4 bg-slate-900 flex flex-col gap-3"
+                    >
+                      <div className="flex justify-between items-start gap-2">
+                        <h3 className="text-base font-semibold">{m.title}</h3>
+                        <div className="flex flex-col items-end gap-1">
+                          <span className="text-[10px] uppercase tracking-wide text-slate-400">
+                            {m.venue}
+                          </span>
+                          <span className="text-[9px] text-slate-500">
+                            updated{" "}
+                            {new Date(m.lastUpdated).toLocaleTimeString()}
+                          </span>
                         </div>
-                        <div className="flex gap-2 items-center">
-                          <label className="text-xs text-slate-300 w-24">
-                            Stake
-                          </label>
-                          <input
-                            type="number"
-                            min={1}
-                            value={stake}
-                            onChange={(e) =>
-                              setStakeByMarket((prev) => ({
-                                ...prev,
-                                [m.id]: Number(e.target.value),
-                              }))
-                            }
-                            className="w-28 rounded-md bg-slate-950 border border-slate-800 px-2 py-1 text-xs"
-                          />
-                          <span className="text-xs text-slate-400">USDV</span>
-                        </div>
-                        <button
-                          onClick={() => handleTrade(m.id)}
-                          className="mt-1 w-full rounded-md bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold py-1.5"
-                        >
-                          Buy YES
-                        </button>
                       </div>
-                    ) : (
-                      <p className="mt-2 text-[11px] text-slate-500 border-t border-slate-800 pt-2">
-                        Login (dev) to simulate trades.
-                      </p>
-                    )}
-                  </div>
-                );
-              })}
-              {markets.length === 0 && (
-                <p className="text-sm text-slate-400">
-                  No markets yet. Seed via backend.
-                </p>
-              )}
-            </div>
+
+                      {m.description && (
+                        <p className="text-sm text-slate-300 line-clamp-3">
+                          {m.description}
+                        </p>
+                      )}
+
+                      <div className="flex items-center justify-between text-xs text-slate-400">
+                        <span>Status: {m.status}</span>
+                        <span>Phase 1 · virtual only</span>
+                      </div>
+
+                      {/* Trade ticket */}
+                      {user ? (
+                        <div className="mt-2 space-y-2 border-t border-slate-800 pt-2">
+                          <div className="flex gap-2 items-center">
+                            <label className="text-xs text-slate-300 w-24">
+                              Probability
+                            </label>
+                            <input
+                              type="number"
+                              min={1}
+                              max={99}
+                              value={prob}
+                              onChange={(e) =>
+                                setProbByMarket((prev) => ({
+                                  ...prev,
+                                  [m.id]: Number(e.target.value),
+                                }))
+                              }
+                              className="w-20 rounded-md bg-slate-950 border border-slate-800 px-2 py-1 text-xs"
+                            />
+                            <span className="text-xs text-slate-400">%</span>
+                          </div>
+
+                          <div className="flex gap-2 items-center">
+                            <label className="text-xs text-slate-300 w-24">
+                              Stake
+                            </label>
+                            <input
+                              type="number"
+                              min={1}
+                              value={stake}
+                              onChange={(e) =>
+                                setStakeByMarket((prev) => ({
+                                  ...prev,
+                                  [m.id]: Number(e.target.value),
+                                }))
+                              }
+                              className="w-28 rounded-md bg-slate-950 border border-slate-800 px-2 py-1 text-xs"
+                            />
+                            <span className="text-xs text-slate-400">USDV</span>
+                          </div>
+
+                          <button
+                            onClick={() => handleTrade(m.id)}
+                            className="mt-1 w-full rounded-md bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold py-1.5"
+                          >
+                            Buy YES
+                          </button>
+                        </div>
+                      ) : (
+                        <p className="mt-2 text-[11px] text-slate-500 border-t border-slate-800 pt-2">
+                          Login (dev) to simulate trades.
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {markets.length === 0 && (
+                  <p className="text-sm text-slate-400">
+                    No markets yet. Seed via backend.
+                  </p>
+                )}
+              </div>
+            </>
           )}
         </section>
 
