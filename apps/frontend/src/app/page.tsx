@@ -314,25 +314,6 @@ export default function HomePage() {
         {/* Markets + trade ticket */}
         <section className="space-y-3">
           <h2 className="text-lg font-semibold">Markets</h2>
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-xs text-slate-400">Filter venue:</span>
-            {(
-              ["all", "oddgrid", "polymarket", "kalshi", "manifold"] as const
-            ).map((v) => (
-              <button
-                key={v}
-                onClick={() => setVenueFilter(v)}
-                className={`px-2 py-1 text-[11px] rounded-md border ${
-                  venueFilter === v
-                    ? "border-sky-500 bg-sky-900/40 text-sky-100"
-                    : "border-slate-700 bg-slate-900 text-slate-300"
-                }`}
-              >
-                {v.toUpperCase()}
-              </button>
-            ))}
-          </div>
-
           {loadingMarkets ? (
             <p className="text-sm text-slate-300">Loading markets…</p>
           ) : (
