@@ -6,13 +6,14 @@ import { PrismaClient } from "@prisma/client";
 import { OddgridAdapter } from "./aggregation/oddgridAdapter";
 import { MarketAggregationService } from "./aggregation/marketAggregationService";
 import { PolymarketAdapter } from "./aggregation/polymarketAdapter";
-
+import { KalshiAdapter } from "./aggregation/kalshiAdapter";
 
 
 const prisma = new PrismaClient();
 const aggregationService = new MarketAggregationService([
   new OddgridAdapter(prisma),
   new PolymarketAdapter(),
+  new KalshiAdapter(),
 ]);
 const app = express();
 
